@@ -3,7 +3,7 @@ from simple_exact_diagonalization_routines.local_matrix_class import *
 import itertools
 import math
 
-class Pauli_algebra:
+class Pauli_algebra_DBI:
     def __init__(self, L):
         self.L = L
         self.X = X_class(self.L)
@@ -46,7 +46,7 @@ class Pauli_algebra:
                 decomp[pauli_op[0]] = expect
         return decomp
         
-class ising_model(Pauli_algebra):
+class ising_model(Pauli_algebra_DBI):
     """
     H = J_{i,j}Z_iZ_j + BiZi + 2DXi
     Options for J:
