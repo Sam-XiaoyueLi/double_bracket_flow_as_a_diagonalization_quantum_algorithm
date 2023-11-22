@@ -67,6 +67,7 @@ class double_bracket_flow:
         self.please_be_visual = please_be_visual
         self.please_be_exhaustively_visual = please_be_exhaustively_visual
         self.please_evaluate_timing = False
+        self.please_use_quadratic_optimization = False
 
         #It is not needed to initialize but just to summarize some naming conventions
         self.flow_outputs = {
@@ -274,6 +275,43 @@ class double_bracket_flow:
         self.please_compute_observables = False
         self.please_update_flow_unitary = False
 
+    # Computation of nth Gamma function i.e [W,...,[W,[W,H]]...]
+    def gamma(self, n, H = None, D = None):
+        if H is None:
+            H = self.H
+        if D is None:
+            D = self.flow_generator['operator']
+        if n == 0:
+            return H
+        else:
+            W = self.commutator(self.delta(D),self.sigma(H))
+            result = H
+            for i in range(n):
+                result = self.commutator(W,result)
+        return result
+    
+    # s step that minimizes the third order approximation    
+    def s_min_quadratic(self, H = None, D = None):
+        if H is None:
+            H = self.H
+        if D is None:
+            D = self.flow_generator['operator']
+        flow = double_bracket_flow(H)
+
+        a = np.trace(3*flow.sigma(self.gamma(1,H,D))@flow.sigma(self.gamma(2,H,D)))
+        a += np.trace(flow.sigma(self.gamma(0,H,D))@flow.sigma(self.gamma(3,H,D)))
+
+        b = 2*np.trace(flow.sigma(self.gamma(1,H,D))@flow.sigma(self.gamma(1,H,D)))
+        b += 2*np.trace(flow.sigma(self.gamma(0,H,D))@flow.sigma(self.gamma(2,H,D)))
+
+        c = 2*np.trace(flow.sigma(self.gamma(0,H,D))@flow.sigma(self.gamma(1,H,D)))
+
+        delta = b**2 - 4*a*c
+
+        s = (-b+np.sqrt(delta))/(2*a)
+        # s_minus always negative
+        return s
+    
     def find_minimizing_flow_step( self, H = None ): 
         if self.please_evaluate_timing is True:
             start = time.clock()
@@ -291,14 +329,20 @@ class double_bracket_flow:
         self.please_update_flow_unitary = False
 
         # For non-binary search, go through all s-grid sequentially and find min
-        if self.please_use_binary_search is False:
-
-            if self.custom_flow_step_list is None:
+        if self.custom_flow_step_list is None:
                 s_grid = np.linspace( self.flow_step_min, self.flow_step_max, self.nmb_search_points_minimizing_s_search )
                 # print('s_grid', s_grid)
-            else:
-                s_grid = self.custom_flow_step_list
-            
+        else:
+            s_grid = self.custom_flow_step_list
+                
+        if self.please_use_binary_search is False and self.please_use_quadratic_optimization is False:
+
+            # if self.custom_flow_step_list is None:
+            #     s_grid = np.linspace( self.flow_step_min, self.flow_step_max, self.nmb_search_points_minimizing_s_search )
+            #     # print('s_grid', s_grid)
+            # else:
+            #     s_grid = self.custom_flow_step_list
+            # print('Computing s with grid search') 
             for s in s_grid:       
                 if self.please_be_exhaustively_verbose is True:
                     print("Searching for minimizing flow step using s = ", s, " and flow generator type ", self.flow_generator['type'] )
@@ -310,7 +354,7 @@ class double_bracket_flow:
             minimizing_flow_step = s_grid[ np.argmin( norms_sigma_H_s )]
             optimally_flowed_H = self.flow_step( minimizing_flow_step, H )         
 
-        else:
+        elif self.please_use_binary_search is True:
             s_grid = []
             s_R = self.flow_step_max 
             s_L = self.flow_step_min
@@ -343,7 +387,14 @@ class double_bracket_flow:
             minimal_norm_sigma_H_s = np.min( norm_mid )
             minimizing_flow_step = s_mid
             optimally_flowed_H = H_mid    
-            
+        
+        elif self.please_use_quadratic_optimization is True:
+            # print('Computing s with quadratic search')
+            minimizing_flow_step = self.s_min_quadratic(H)
+            optimally_flowed_H = self.flow_step(minimizing_flow_step, H )
+            minimal_norm_sigma_H_s = np.linalg.norm( double_bracket_flow.sigma( optimally_flowed_H ), self.norm_type )
+            # print("Searching for minimizing flow step using s = ", minimizing_flow_step, " and flow generator type", self.flow_generator['type']) 
+            # print(" Norm_sigma_H ", minimal_norm_sigma_H_s)
 
         if self.please_be_verbose is True:
             if self.please_evaluate_timing is True:
@@ -407,7 +458,7 @@ class double_bracket_flow:
         
         if self.please_be_exhaustively_verbose is True:
             print( self.flow_outputs ) 
-
+        print(self.nmb_flow_steps)
         for i in range( self.nmb_flow_steps ):
             if self.please_be_verbose is True:
                 print( "Flow step ", i, " using H with norm ", np.linalg.norm( H ) )

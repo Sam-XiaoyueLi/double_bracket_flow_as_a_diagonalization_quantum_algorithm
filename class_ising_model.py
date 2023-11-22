@@ -5,12 +5,12 @@ import math
 
 class Pauli_algebra_DBI:
     def __init__(self, L):
-        self.L = L
-        self.X = X_class(self.L)
+        self.L = L  # Store the system size (L)
+        self.X = X_class(self.L) # Initialize Pauli X operator for the system
         self.Y = Y_class(self.L)
         self.Z = Z_class(self.L)
-        self.id = np.eye(2**self.L)
-        self.pauli_basis_dict = self.Pauli_basis()
+        self.id = np.eye(2**self.L) # Identity matrix for the system
+        self.pauli_basis_dict = self.Pauli_basis() # Generate and store all the pauli operators {0,1,2,3}^L
     
     @staticmethod
     def compute_expectation(H, P):
